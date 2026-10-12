@@ -265,7 +265,8 @@ function serveStatic(pathname, res) {
     throw new HttpError(404, 'Not found');
   }
   const ext = path.extname(file).slice(1);
-  res.writeHead(200, { 'Content-Type': MIME[ext] || 'application/octet-stream' });
+  // Sin caché: al actualizar SoulGraph basta con recargar / No cache: after updating SoulGraph a reload is enough
+  res.writeHead(200, { 'Content-Type': MIME[ext] || 'application/octet-stream', 'Cache-Control': 'no-cache' });
   fs.createReadStream(file).pipe(res);
 }
 
