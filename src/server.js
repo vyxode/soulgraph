@@ -14,6 +14,7 @@ const fs = require('fs');
 const http = require('http');
 const path = require('path');
 const { SCRIPT_KINDS } = require('./studio');
+const { searchCode } = require('./search');
 
 const PUBLIC_DIR = path.join(__dirname, '..', 'public');
 const MAX_BODY_BYTES = 32 * 1024 * 1024;
@@ -56,11 +57,12 @@ function createServer(project) {
 
   // El paso a "desconectado" no lo avisa nadie: lo comprobamos cada pocos segundos.
   // Going "disconnected" isn't announced by anyone: we check every few seconds.
-  let wasConnected = project.studio.connected;
+  let lastStatus = JSON.stringify(project.studio.status().sessions.map((s) => s.connected));
   const statusTimer = setInterval(() => {
-    const now = project.studio.connected;
-    if (now !== wasConnected) broadcast('status', project.studio.status());
-    wasConnected = now;
+    const status = project.studio.status();
+    const now = JSON.stringify(status.sessions.map((s) => s.connected));
+    if (now !== lastStatus) broadcast('status', status);
+    lastStatus = now;
   }, 3000);
   const keepAlive = setInterval(() => {
     for (const res of sseClients) res.write(': ping\n\n');
@@ -72,23 +74,32 @@ function createServer(project) {
     'GET /api/graph': () => ({
       version: project.version,
       project: project.name,
+      root: project.config.root,
       studio: project.studio.status(),
       nodes: project.graph.nodes,
       links: project.graph.links,
+      issues: project.graph.issues,
+    }),
+
+    // Buscar texto dentro del código de todo el proyecto / Search text inside all the project's code
+    'GET /api/search': (req, url) => searchCode(project, url.searchParams.get('q') || '', {
+      limit: Number(url.searchParams.get('limit')) || 200,
     }),
 
     'GET /api/node': (req, url) => {
       const node = findNode(url.searchParams.get('id'));
-      const result = { node };
+      // Una función se edita dentro de su módulo / A function is edited inside its module
+      const target = editTarget(node);
+      const result = { node, editId: target.id };
 
-      if (node.source === 'disk' && node.editable) {
-        const abs = project.disk.resolve(node.id);
+      if (target.source === 'disk' && target.editable) {
+        const abs = project.disk.resolve(target.id);
         const stat = fs.statSync(abs);
         result.content = fs.readFileSync(abs, 'utf8');
         result.base = String(stat.mtimeMs);
-      } else if (node.source === 'studio' && project.studio.sources.has(node.id)) {
-        result.content = project.studio.sources.get(node.id);
-        result.base = node.rev;
+      } else if (target.source === 'studio' && project.studio.sources.has(target.id)) {
+        result.content = project.studio.sources.get(target.id);
+        result.base = target.rev;
       }
       return result;
     },
@@ -113,7 +124,7 @@ function createServer(project) {
     'POST /api/save': async (req) => {
       const { id, content, base } = await readJson(req);
       if (typeof content !== 'string') throw new HttpError(400, 'content must be a string');
-      const node = findNode(id);
+      const node = editTarget(findNode(id));
 
       if (node.source === 'disk') return saveDiskFile(node, content, base);
       if (node.source === 'studio') return saveStudioScript(node, content, base);
@@ -124,16 +135,15 @@ function createServer(project) {
     // Commands for Studio: open/select, or change name and attributes.
     'POST /api/studio/command': async (req) => {
       const body = await readJson(req);
-      const node = findNode(body.id);
-      if (node.source !== 'studio') throw new HttpError(400, 'Not a Studio node');
-      requireStudio();
+      const node = editTarget(findNode(body.id));
+      if (node.source !== 'studio' || !node.rawId) throw new HttpError(400, 'Not a Studio instance');
+      requireStudio(node);
 
       if (body.type === 'open') {
-        project.studio.enqueue({ type: 'open', id: node.rawId });
+        project.studio.enqueue(node, { type: 'open', line: Number(body.line) || undefined });
       } else if (body.type === 'props') {
-        project.studio.enqueue({
+        project.studio.enqueue(node, {
           type: 'props',
-          id: node.rawId,
           name: typeof body.name === 'string' && body.name.trim() ? body.name.trim() : undefined,
           attrs: cleanAttributes(body.attrs),
         });
@@ -145,23 +155,24 @@ function createServer(project) {
 
     // ----- Lo que llama el plugin de Studio / What the Studio plugin calls -----
 
+    // Cada ventana de Studio se identifica con `session` / Each Studio window identifies itself with `session`
     'POST /api/studio/tree': async (req) => {
       const body = await readJson(req);
-      return { need: project.studio.setTree(body.place, body.nodes) };
+      return { need: project.studio.setTree(body.session, body.place, body.nodes) };
     },
 
     'POST /api/studio/sources': async (req) => {
       const body = await readJson(req);
-      project.studio.setSources(body.items);
+      project.studio.setSources(body.session, body.items);
       return { ok: true };
     },
 
-    'GET /api/studio/ping': () => {
-      project.studio.touch();
+    'GET /api/studio/ping': (req, url) => {
+      project.studio.touch(url.searchParams.get('session'));
       return { ok: true };
     },
 
-    'GET /api/studio/poll': (req, url, res) => project.studio.poll(res),
+    'GET /api/studio/poll': (req, url, res) => project.studio.poll(url.searchParams.get('session'), res),
   };
 
   // ---------- Ayudantes / Helpers ----------
@@ -172,8 +183,12 @@ function createServer(project) {
     return node;
   }
 
-  function requireStudio() {
-    if (!project.studio.connected) throw new HttpError(503, 'Roblox Studio is not connected');
+  function requireStudio(node) {
+    if (!project.studio.isConnectedNode(node)) throw new HttpError(503, 'Roblox Studio is not connected');
+  }
+
+  function editTarget(node) {
+    return node.kind === 'function' ? findNode(node.parent) : node;
   }
 
   function saveDiskFile(node, content, base) {
@@ -194,11 +209,11 @@ function createServer(project) {
 
   function saveStudioScript(node, content, base) {
     if (!SCRIPT_KINDS.has(node.kind)) throw new HttpError(400, 'Only scripts have source');
-    requireStudio();
+    requireStudio(node);
     if (base !== node.rev) {
       throw new HttpError(409, 'Script changed in Studio', { content: project.studio.sources.get(node.id), base: node.rev });
     }
-    project.studio.enqueue({ type: 'source', id: node.rawId, source: content });
+    project.studio.enqueue(node, { type: 'source', source: content });
     // Lo damos por hecho ya; el plugin confirmará con el mismo código.
     // Assume it's done now; the plugin will confirm with the same source.
     project.studio.setSource(node.id, content);

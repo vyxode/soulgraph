@@ -33,7 +33,7 @@ entiende todo el proyecto sin abrir archivo por archivo.
 **Requirements:** [Node.js 20+](https://nodejs.org). No `npm install` needed.
 
 ```bash
-git clone https://github.com/Vyxode/soulgraph.git
+git clone https://github.com/vyxode/soulgraph.git
 node soulgraph/bin/soulgraph.js serve path/to/your/project
 ```
 
@@ -46,7 +46,7 @@ A **SoulGraph** button in the Plugins tab turns sync on and off.
 **Claude Code:**
 
 ```text
-/plugin marketplace add Vyxode/soulgraph
+/plugin marketplace add vyxode/soulgraph
 /plugin install soulgraph@vyxode
 ```
 
@@ -58,7 +58,7 @@ No plugin? Run `node soulgraph/bin/soulgraph.js init path/to/project` — it add
 **Necesitas:** [Node.js 20+](https://nodejs.org). No hace falta `npm install`.
 
 ```bash
-git clone https://github.com/Vyxode/soulgraph.git
+git clone https://github.com/vyxode/soulgraph.git
 node soulgraph/bin/soulgraph.js serve ruta/a/tu/proyecto
 ```
 

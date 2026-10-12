@@ -47,6 +47,9 @@ function kindOfInstance(node) {
     case 'Script': return node.runContext === 'Client' ? 'client' : 'server';
     case 'LocalScript': return 'client';
     case 'ModuleScript': return 'module';
+    case 'RemoteEvent': case 'UnreliableRemoteEvent': case 'RemoteFunction':
+    case 'BindableEvent': case 'BindableFunction':
+      return 'remote';
     case 'Folder': return 'folder';
     case 'Model': case 'Actor': return 'model';
     default: return 'instance';

@@ -15,6 +15,7 @@ const { writeOutputs } = require('./map-writer');
 
 const REBUILD_DELAY_MS = 250; // agrupa ráfagas de cambios / batches bursts of changes
 const WRITE_DELAY_MS = 1000; // MAP.md no necesita escribirse en cada tecla / no need to write MAP.md on every keystroke
+const BULK_LOAD = 200; // más nodos nuevos de golpe = carga inicial / more new nodes at once = initial load
 
 class Project extends EventEmitter {
   constructor(config) {
@@ -30,6 +31,8 @@ class Project extends EventEmitter {
     this.diskDirty = true;
     this.graph = { nodes: [], links: [] };
     this.byId = new Map();
+    this.signatures = null;
+    this.changedAt = new Map();
     this.version = 0;
     this.rebuildTimer = null;
     this.writeTimer = null;
@@ -45,10 +48,43 @@ class Project extends EventEmitter {
     }
     this.graph = buildGraph(this.diskNodes, [...this.studio.nodes.values()]);
     this.byId = new Map(this.graph.nodes.map((n) => [n.id, n]));
+    this.markChanges();
     this.version++;
     this.emit('graph', this.version);
     this.scheduleWrite();
     return this.graph;
+  }
+
+  // Apunta cuándo cambió cada nodo, para que el panel lo haga "disparar" y filtre lo reciente.
+  // Records when each node changed, so the panel can make it "fire" and filter recent ones.
+  markChanges() {
+    const now = Date.now();
+    const firstBuild = !this.signatures;
+    const next = new Map();
+    const fresh = [];
+    for (const n of this.graph.nodes) {
+      const signature = n.rev ?? JSON.stringify([n.name, n.parent, n.attrs, n.tags, n.children, n.disabled]);
+      const before = firstBuild ? signature : this.signatures.get(n.id);
+      if (before === undefined) fresh.push(n);
+      else if (before !== signature) n.changedAt = now;
+      else if (this.changedAt.has(n.id)) n.changedAt = this.changedAt.get(n.id);
+      next.set(n.id, signature);
+    }
+    // Un lugar que se conecta (o reconecta con ids nuevos) no es "actividad": solo cuentan
+    // los nodos nuevos sueltos. Se mira por ámbito: el disco y cada ventana de Studio.
+    // A place connecting (or reconnecting with new ids) isn't "activity": only scattered
+    // new nodes count. Checked per scope: the disk and each Studio window.
+    const scopeOf = (n) => n.session || n.source;
+    const total = new Map();
+    const added = new Map();
+    for (const n of this.graph.nodes) total.set(scopeOf(n), (total.get(scopeOf(n)) || 0) + 1);
+    for (const n of fresh) added.set(scopeOf(n), (added.get(scopeOf(n)) || 0) + 1);
+    for (const n of fresh) {
+      const count = added.get(scopeOf(n));
+      if (count <= BULK_LOAD && count <= Math.max(20, total.get(scopeOf(n)) * 0.3)) n.changedAt = now;
+    }
+    this.signatures = next;
+    this.changedAt = new Map(this.graph.nodes.filter((n) => n.changedAt).map((n) => [n.id, n.changedAt]));
   }
 
   scheduleRebuild({ disk = false } = {}) {

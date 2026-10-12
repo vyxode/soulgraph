@@ -7,12 +7,16 @@
 //   symbols: nombres que define el archivo (funciones, clases...)
 //   imports: nombres de módulos que usa (se enlazan con otros nodos por nombre)
 //   refs:    nombres de archivo que menciona
+//   calls:   funciones de otros módulos que usa, como "Modulo.funcion"
+//   sends / listens: eventos (RemoteEvent, BindableEvent...) que dispara / escucha
 //
 // An analyzer is an object { name, test(info), analyze(text, info) }.
 // `analyze` returns any combination of:
 //   symbols: names the file defines (functions, classes...)
 //   imports: module names it uses (linked to other nodes by name)
 //   refs:    file names it mentions
+//   calls:   other modules' functions it uses, as "Module.function"
+//   sends / listens: events (RemoteEvent, BindableEvent...) it fires / listens to
 //
 // Para añadir un lenguaje (Python, C#...) crea un archivo en esta carpeta y añádelo aquí.
 // To add a language (Python, C#...) create a file in this folder and add it here.
@@ -23,7 +27,7 @@ const ANALYZERS = [
 ];
 
 function analyze(text, info) {
-  const result = { symbols: [], imports: [], refs: [] };
+  const result = { symbols: [], imports: [], refs: [], calls: [], sends: [], listens: [] };
 
   for (const analyzer of ANALYZERS) {
     if (!analyzer.test(info)) continue;
@@ -39,6 +43,11 @@ function analyze(text, info) {
     }
   }
 
+  // Sin listas vacías: el grafo pesa menos / No empty lists: keeps the graph light
+  for (const key of Object.keys(result)) {
+    if (result[key].length) result[key] = [...new Set(result[key])];
+    else delete result[key];
+  }
   return result;
 }
 

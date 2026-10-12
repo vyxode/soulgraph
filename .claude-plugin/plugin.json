@@ -4,10 +4,10 @@
   "description": "Gives Claude a live map of your project (files + Roblox Studio) so it finds things without opening files one by one. Includes a 3D neural-network panel on localhost.",
   "author": {
     "name": "Vyxode",
-    "url": "https://github.com/Vyxode"
+    "url": "https://github.com/vyxode"
   },
-  "homepage": "https://github.com/Vyxode/soulgraph",
-  "repository": "https://github.com/Vyxode/soulgraph",
+  "homepage": "https://github.com/vyxode/soulgraph",
+  "repository": "https://github.com/vyxode/soulgraph",
   "license": "MIT",
   "keywords": ["roblox", "roblox-studio", "knowledge-graph", "code-map", "luau"]
 }

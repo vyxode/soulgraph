@@ -54,6 +54,32 @@ button { cursor: pointer; }
 .brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .brand svg { width: 18px; height: 18px; fill: var(--accent); filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.7)); }
 .brand-name { font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; font-size: 12px; }
+.by { color: var(--faint); font-size: 10px; letter-spacing: 0.12em; text-decoration: none; text-transform: uppercase; }
+.by .glitch { color: var(--text); font-weight: 700; }
+.by:hover .glitch { color: #fff; }
+
+/* Glitch blanco y negro de Vyxode: dos copias desplazadas que parpadean de vez en cuando.
+   Vyxode's black & white glitch: two shifted copies that flicker every now and then. */
+.glitch { position: relative; display: inline-block; }
+.glitch::before, .glitch::after {
+  content: attr(data-text); position: absolute; inset: 0; pointer-events: none; opacity: 0;
+}
+.glitch::before { color: #ffffff; animation: glitch-a 5s infinite steps(1); }
+.glitch::after { color: #6d7287; animation: glitch-b 5s infinite steps(1); }
+@keyframes glitch-a {
+  0%, 91%, 100% { opacity: 0; transform: none; clip-path: none; }
+  92% { opacity: 1; transform: translate(-2px, -1px); clip-path: inset(0 0 55% 0); }
+  94% { opacity: 1; transform: translate(2px, 0); clip-path: inset(60% 0 0 0); }
+  96% { opacity: 1; transform: translate(-1px, 1px); clip-path: inset(30% 0 40% 0); }
+}
+@keyframes glitch-b {
+  0%, 91%, 100% { opacity: 0; transform: none; clip-path: none; }
+  92% { opacity: 0.9; transform: translate(2px, 1px); clip-path: inset(50% 0 0 0); }
+  95% { opacity: 0.9; transform: translate(-2px, 0); clip-path: inset(0 0 65% 0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .glitch::before, .glitch::after { animation: none; }
+}
 .project {
   color: var(--muted); font-family: var(--mono); font-size: 12px;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
@@ -97,7 +123,43 @@ button { cursor: pointer; }
 .search svg { width: 15px; height: 15px; fill: none; stroke: var(--muted); stroke-width: 2; flex: none; }
 .search input { width: 100%; border: 0; background: transparent; outline: none; }
 .hint { margin: -8px 0 0; min-height: 16px; color: var(--muted); font-size: 11px; }
+.block .hint, #health-list .hint { margin: 4px 6px; }
 
+/* Botones segmentados / Segmented buttons */
+.segmented { display: flex; padding: 2px; border: 1px solid var(--line); border-radius: 8px; background: rgba(0, 0, 0, 0.35); }
+.segmented button {
+  flex: 1; padding: 4px 8px; border: 0; border-radius: 6px; background: transparent; color: var(--muted); font-size: 12px;
+}
+.segmented button[aria-pressed="true"] { background: rgba(255, 255, 255, 0.1); color: var(--text); }
+
+/* Resultados de búsqueda en el código / Code search results */
+.code-results { display: flex; flex-direction: column; gap: 2px; max-height: 38vh; overflow-y: auto; margin-top: -6px; }
+.code-results:empty { display: none; }
+.code-hit {
+  display: flex; flex-direction: column; gap: 1px; padding: 5px 6px; border: 0; border-radius: 6px;
+  background: transparent; text-align: left;
+}
+.code-hit:hover { background: rgba(255, 255, 255, 0.05); }
+.code-hit .where { color: var(--muted); font-family: var(--mono); font-size: 11px; }
+.code-hit .snippet { font-family: var(--mono); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text); }
+mark { background: rgba(255, 209, 102, 0.3); color: #fff3cf; border-radius: 3px; }
+
+/* Secciones plegables / Collapsible sections */
+.block summary { display: flex; align-items: center; gap: 8px; cursor: pointer; list-style: none; }
+.block summary::-webkit-details-marker { display: none; }
+.block summary h2 { margin: 0; }
+.block summary::after { content: "▸"; margin-left: auto; color: var(--faint); font-size: 10px; transition: transform 0.15s; }
+.block[open] summary::after { transform: rotate(90deg); }
+.block[open] summary { margin-bottom: 6px; }
+.badge { min-width: 18px; padding: 0 6px; border-radius: 99px; font-size: 10px; font-family: var(--mono); text-align: center; }
+.badge.bad { background: rgba(255, 93, 108, 0.18); color: var(--bad); }
+.issue-group summary { display: flex; justify-content: space-between; padding: 4px 6px; border-radius: 6px; cursor: pointer; color: var(--text); }
+.issue-group summary:hover { background: rgba(255, 255, 255, 0.04); }
+.issue-group summary .count { color: var(--bad); font-family: var(--mono); font-size: 11px; }
+.issue-group .link-item { padding-left: 16px; }
+.chip.bad { border-color: rgba(255, 93, 108, 0.45); color: var(--bad); }
+
+.sidebar > * { flex-shrink: 0; }
 .sidebar h2 {
   margin: 0 0 6px; font-size: 10px; font-weight: 600;
   letter-spacing: 0.16em; text-transform: uppercase; color: var(--faint);
@@ -168,6 +230,9 @@ button.chip:hover { color: var(--text); border-color: var(--line-strong); }
 
 /* Editor de código / Code editor */
 .editor { display: flex; flex-direction: column; min-height: 320px; flex: 1; }
+.editor-host { height: 52vh; min-height: 280px; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.editor-host .cm-editor { height: 100%; }
+.editor-host .cm-editor.cm-focused { outline: none; }
 .editor textarea {
   flex: 1; min-height: 320px; width: 100%; resize: vertical;
   padding: 12px; border: 1px solid var(--line); border-radius: 8px;
@@ -232,5 +297,5 @@ button.chip:hover { color: var(--text); border-color: var(--line-strong); }
 }
 @media (max-width: 600px) {
   .sidebar { display: none; }
-  .project { display: none; }
+  .project, .by { display: none; }
 }

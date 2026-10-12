@@ -39,7 +39,7 @@ test('builds disk graph with reference links and writes MAP.md', () => {
 test('studio bridge: tree, sources, require links and mirror files', () => {
   const { root, config } = makeProject();
   const project = new Project(config);
-  const need = project.studio.setTree('Test Place', [
+  const need = project.studio.setTree('123', 'Test Place', [
     { id: 'rs', name: 'ReplicatedStorage', class: 'ReplicatedStorage' },
     { id: 'mod', name: 'Ciclo', class: 'ModuleScript', parent: 'rs' },
     { id: 'sss', name: 'ServerScriptService', class: 'ServerScriptService' },
@@ -47,16 +47,57 @@ test('studio bridge: tree, sources, require links and mirror files', () => {
   ]);
   assert.deepEqual(need.sort(), ['main', 'mod']);
 
-  project.studio.setSources([
+  project.studio.setSources('123', [
     { id: 'mod', source: 'local M = {}\nfunction M.go() end\nreturn M' },
-    { id: 'main', source: 'require(game.ReplicatedStorage.Ciclo).go()' },
+    { id: 'main', source: 'local Ciclo = require(game.ReplicatedStorage.Ciclo)\nCiclo.go()' },
   ]);
   project.rebuild();
   project.close();
 
-  assert.ok(project.graph.links.some((l) => l.type === 'requires' && l.source === 'studio:main' && l.target === 'studio:mod'));
-  const mirror = path.join(root, '.soulgraph', 'studio', 'ServerScriptService', 'Main.server.lua');
-  assert.equal(fs.readFileSync(mirror, 'utf8'), 'require(game.ReplicatedStorage.Ciclo).go()');
+  assert.ok(project.graph.links.some((l) => l.type === 'requires' && l.source === 'studio:123:main' && l.target === 'studio:123:mod'));
+  // La llamada a Ciclo.go() enlaza con el nodo de la función / The Ciclo.go() call links to the function node
+  assert.ok(project.graph.links.some((l) => l.type === 'calls' && l.source === 'studio:123:main' && l.target === 'studio:123:mod#M.go'));
+  const mirror = path.join(root, '.soulgraph', 'studio', 'Test Place', 'ServerScriptService', 'Main.server.lua');
+  assert.equal(fs.readFileSync(mirror, 'utf8'), 'local Ciclo = require(game.ReplicatedStorage.Ciclo)\nCiclo.go()');
+});
+
+test('graph: remote events, health issues and separate Studio windows', () => {
+  const { buildGraph } = require('../src/graph');
+  const node = (session, id, extra) => ({ id: `studio:${session}:${id}`, source: 'studio', session, ...extra });
+  const graph = buildGraph([], [
+    node('a', 'ev', { kind: 'remote', class: 'RemoteEvent', name: 'Dano' }),
+    node('a', 'cli', { kind: 'client', name: 'Arma', sends: ['Dano'], imports: ['NoExiste'] }),
+    node('a', 'srv', { kind: 'server', name: 'Combate', listens: ['Dano'] }),
+    node('a', 'm1', { kind: 'module', name: 'Uno', imports: ['Dos'] }),
+    node('a', 'm2', { kind: 'module', name: 'Dos', imports: ['Uno'] }),
+    node('b', 'm3', { kind: 'module', name: 'Uno' }), // otra ventana: no es duplicado / another window: not a duplicate
+  ]);
+  const has = (type, source, target) => graph.links.some((l) => l.type === type && l.source === source && l.target === target);
+  assert.ok(has('signal', 'studio:a:cli', 'studio:a:ev'));
+  assert.ok(has('signal', 'studio:a:ev', 'studio:a:srv'));
+  assert.ok(!has('requires', 'studio:a:m2', 'studio:b:m3'));
+
+  const types = graph.issues.map((i) => i.type).sort();
+  assert.deepEqual(types, ['broken-require', 'cycle', 'unused-module']);
+  assert.equal(graph.issues.find((i) => i.type === 'unused-module').ids[0], 'studio:b:m3');
+});
+
+test('recent activity: a place connecting is not activity, a new script is', () => {
+  const { config } = makeProject();
+  const project = new Project(config);
+  project.rebuild();
+  const tree = [
+    { id: 'rs', name: 'ReplicatedStorage', class: 'ReplicatedStorage' },
+    ...Array.from({ length: 30 }, (_, i) => ({ id: `m${i}`, name: `Mod${i}`, class: 'ModuleScript', parent: 'rs' })),
+  ];
+  project.studio.setTree('1', 'Place', tree);
+  project.rebuild();
+  assert.equal(project.graph.nodes.filter((n) => n.changedAt).length, 0);
+
+  project.studio.setTree('1', 'Place', [...tree, { id: 'new', name: 'Nuevo', class: 'Script', parent: 'rs' }]);
+  project.rebuild();
+  project.close();
+  assert.deepEqual(project.graph.nodes.filter((n) => n.changedAt).map((n) => n.name), ['Nuevo']);
 });
 
 test('server: saves files, detects conflicts and blocks foreign hosts/origins', async () => {

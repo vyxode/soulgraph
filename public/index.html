@@ -11,7 +11,8 @@
   <header class="topbar">
     <div class="brand">
       <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M16 1 C17 12 20 15 31 16 C20 17 17 20 16 31 C15 20 12 17 1 16 C12 15 15 12 16 1Z"/></svg>
-      <span class="brand-name">SoulGraph</span>
+      <span class="brand-name glitch" data-text="SOULGRAPH">SOULGRAPH</span>
+      <a class="by" href="https://github.com/vyxode/soulgraph" target="_blank" rel="noopener">by <span class="glitch" data-text="VYXODE">VYXODE</span></a>
       <span class="project" id="project-name"></span>
     </div>
     <div class="status">
@@ -22,11 +23,29 @@
   </header>
 
   <aside class="sidebar" aria-label="Filters">
+    <div class="segmented" id="search-mode" role="group">
+      <button type="button" data-mode="names" aria-pressed="true" data-i18n="modeNames"></button>
+      <button type="button" data-mode="code" aria-pressed="false" data-i18n="modeCode"></button>
+    </div>
     <label class="search">
       <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
       <input id="search" type="search" autocomplete="off" spellcheck="false">
     </label>
     <p class="hint" id="search-hint"></p>
+    <div class="code-results" id="code-results"></div>
+
+    <details class="block" open>
+      <summary><h2 data-i18n="recent"></h2></summary>
+      <button class="filter off" id="only-recent" type="button" aria-pressed="false">
+        <span class="dot" style="color:#ffffff"></span><span class="label" data-i18n="onlyRecent"></span>
+      </button>
+      <div class="links-list" id="recent-list"></div>
+    </details>
+
+    <details class="block">
+      <summary><h2 data-i18n="health"></h2><span class="badge" id="health-count"></span></summary>
+      <div id="health-list"></div>
+    </details>
 
     <section>
       <h2 data-i18n="sources"></h2>
@@ -39,6 +58,14 @@
     <section>
       <h2 data-i18n="links"></h2>
       <div id="link-filters"></div>
+    </section>
+    <section>
+      <h2 data-i18n="labels"></h2>
+      <div class="segmented" id="label-mode" role="group">
+        <button type="button" data-mode="off" data-i18n="labelsOff"></button>
+        <button type="button" data-mode="main" data-i18n="labelsMain"></button>
+        <button type="button" data-mode="all" data-i18n="labelsAll"></button>
+      </div>
     </section>
 
     <footer>
@@ -54,6 +81,7 @@
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
   <script src="vendor/graph-bundle.js"></script>
+  <script src="vendor/editor-bundle.js"></script>
   <script type="module" src="app.js"></script>
 </body>
 </html>

@@ -6,6 +6,7 @@
 //   soulgraph [serve] [carpeta|folder] [--port 7777] [--no-open]
 //   soulgraph build [carpeta|folder]
 //   soulgraph init  [carpeta|folder]
+//   soulgraph mcp   [carpeta|folder]
 
 const fs = require('fs');
 const path = require('path');
@@ -13,6 +14,7 @@ const { spawn } = require('child_process');
 const { loadConfig } = require('../src/config');
 const { Project } = require('../src/project');
 const { createServer } = require('../src/server');
+const { startMcp } = require('../src/mcp');
 const pkg = require('../package.json');
 
 const HELP = `
@@ -21,6 +23,8 @@ SoulGraph ${pkg.version} — by Vyxode
   soulgraph [serve] [folder]   Panel en vivo + mapa para Claude / Live panel + map for Claude
   soulgraph build [folder]     Solo regenera .soulgraph/ / Only regenerates .soulgraph/
   soulgraph init [folder]      Añade la config y el aviso en CLAUDE.md / Adds config and CLAUDE.md note
+  soulgraph mcp [folder]       Servidor MCP para Claude (enciende el panel si hace falta)
+                               MCP server for Claude (starts the panel if needed)
 
 Options:
   --port <n>    Puerto del panel / Panel port (default 7777)
@@ -38,7 +42,7 @@ function parseArgs(argv) {
     else if (arg === '-v' || arg === '--version') args.command = 'version';
     else rest.push(arg);
   }
-  if (['serve', 'build', 'init'].includes(rest[0])) args.command = rest.shift();
+  if (['serve', 'build', 'init', 'mcp'].includes(rest[0])) args.command = rest.shift();
   if (rest[0]) args.folder = rest[0];
   return args;
 }
@@ -134,5 +138,6 @@ function openBrowser(url) {
 const args = parseArgs(process.argv.slice(2));
 if (args.command === 'help') console.log(HELP);
 else if (args.command === 'version') console.log(pkg.version);
+else if (args.command === 'mcp') startMcp(args.folder === '.' ? null : args.folder);
 else if (!fs.existsSync(args.folder)) console.error(`[soulgraph] No existe la carpeta / Folder not found: ${args.folder}`);
 else ({ serve, build, init })[args.command](args);

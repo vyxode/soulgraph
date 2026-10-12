@@ -1,6 +1,6 @@
 --[[
 	SoulGraph — plugin de Roblox Studio / Roblox Studio plugin
-	Autor / Author: Vyxode · MIT License · https://github.com/Vyxode/soulgraph
+	Autor / Author: Vyxode · MIT License · https://github.com/vyxode/soulgraph
 
 	ES: Envía en vivo la estructura del juego y el código de cada script al panel de SoulGraph
 	    (http://localhost:7777) y aplica lo que edites desde allí: código, nombre y atributos.
@@ -45,6 +45,13 @@ local MAX_NODES = 4000
 local MIN_SCAN_INTERVAL = 2
 -- Tamaño máximo de cada envío de código / Max size of each source upload
 local MAX_BATCH_BYTES = 400000
+
+-- Eventos: se incluyen siempre, estén donde estén, para ver cómo hablan cliente y servidor.
+-- Events: always included wherever they are, to see how client and server talk.
+local EVENT_CLASSES = {
+	RemoteEvent = true, UnreliableRemoteEvent = true, RemoteFunction = true,
+	BindableEvent = true, BindableFunction = true,
+}
 
 local CONTAINER_CLASSES = {
 	Folder = true, Model = true, Actor = true, Configuration = true,
@@ -95,12 +102,23 @@ end)
 -- HTTP
 ---------------------------------------------------------------------
 
+-- Identifica esta ventana de Studio, para poder tener varios lugares abiertos a la vez.
+-- Identifies this Studio window, so several places can be open at once.
+local function sessionKey()
+	return game.PlaceId ~= 0 and tostring(game.PlaceId) or game.Name
+end
+
 -- Devuelve la respuesta ya decodificada, o nil si el servidor no está.
 -- Returns the decoded response, or nil if the server isn't there.
 local function request(method, path, body)
+	local separator = string.find(path, "?", 1, true) and "&" or "?"
+	local url = SERVER_URL .. path .. separator .. "session=" .. HttpService:UrlEncode(sessionKey())
+	if body then
+		body.session = sessionKey()
+	end
 	local ok, response = pcall(function()
 		return HttpService:RequestAsync({
-			Url = SERVER_URL .. path,
+			Url = url,
 			Method = method,
 			Headers = { ["Content-Type"] = "application/json" },
 			Body = body and HttpService:JSONEncode(body) or nil,
@@ -134,6 +152,11 @@ end
 
 local function isScript(instance)
 	return instance:IsA("LuaSourceContainer")
+end
+
+-- Lo que siempre entra en el grafo, aunque esté muy dentro / Always in the graph, however deep
+local function alwaysIncluded(instance)
+	return isScript(instance) or EVENT_CLASSES[instance.ClassName] == true
 end
 
 local function markDirty()
@@ -222,7 +245,7 @@ local function scan()
 			add(service)
 			addContainers(service, 1)
 			for _, descendant in ipairs(service:GetDescendants()) do
-				if isScript(descendant) then
+				if alwaysIncluded(descendant) then
 					add(descendant)
 				end
 			end
@@ -339,7 +362,7 @@ local function applyCommand(command)
 	elseif command.type == "open" then
 		Selection:Set({ instance })
 		if isScript(instance) then
-			plugin:OpenScript(instance)
+			plugin:OpenScript(instance, tonumber(command.line) or 0)
 		end
 	end
 end
@@ -352,7 +375,7 @@ end
 -- Any script or container appearing or disappearing asks for a new scan.
 local function watchService(service)
 	local function onChange(instance)
-		if isScript(instance) or CONTAINER_CLASSES[instance.ClassName] then
+		if alwaysIncluded(instance) or CONTAINER_CLASSES[instance.ClassName] then
 			dirty = true
 		end
 	end
