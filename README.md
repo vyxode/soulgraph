@@ -30,6 +30,8 @@ el proyecto sin abrir archivo por archivo.
 | 🔗 | **Function graph:** which script calls `Module.function`. | **Grafo de funciones:** qué script llama a `Modulo.funcion`. |
 | 📡 | **RemoteEvents:** who fires each event and who listens to it, client ↔ server. | **RemoteEvents:** quién dispara cada evento y quién lo escucha, cliente ↔ servidor. |
 | 🩺 | **Health:** broken requires, circular dependencies, duplicate names, unused modules, events with no sender or listener. | **Salud:** `require` rotos, dependencias circulares, nombres repetidos, módulos sin usar, eventos sin emisor u oyente. |
+| 🎛️ | **Full or light effects:** picked automatically for your computer; light mode is flat and fast. | **Efectos completos o ligeros:** se eligen solos según tu ordenador; el modo ligero es plano y rápido. |
+| 🧩 | **Readable at scale:** services gather together, repeated models collapse into "N ×" nodes, functions appear when you open their module. | **Legible aunque sea enorme:** los servicios se agrupan, los modelos repetidos se juntan en nodos "N ×" y las funciones aparecen al abrir su módulo. |
 | 🎮 | **Roblox Studio plugin:** live sync of several open places, with edits applied in Studio and undoable with Ctrl+Z. | **Plugin de Roblox Studio:** sincroniza en vivo varios lugares abiertos, y lo que editas se aplica en Studio con Ctrl+Z. |
 
 ---
@@ -169,7 +171,7 @@ Si cambias el puerto, cambia también `SERVER_URL` al principio del plugin de St
 | `src/server.js` | HTTP API and Server-Sent Events, with zero dependencies. / API y SSE sin dependencias. |
 | `src/mcp.js` | MCP server, which starts the panel if needed. / Servidor MCP, que enciende el panel si hace falta. |
 | `src/search.js` | Code search. / Búsqueda en el código. |
-| `public/` | The panel: 3d-force-graph with bloom, plus CodeMirror, bundled to work offline. / El panel, empaquetado sin internet. |
+| `public/` | The panel: `app.js` (data and filters), `view.js` (3D visuals and quality), `inspector.js`, `icons.js`; 3d-force-graph and CodeMirror bundled to work offline. / El panel, empaquetado sin internet. |
 | `roblox/` | Studio plugin. / Plugin de Studio. |
 | `skills/soulgraph/` | The Claude skill. / La skill de Claude. |
 

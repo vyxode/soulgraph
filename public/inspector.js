@@ -8,8 +8,9 @@
 
 import { t, kindLabel, issueLabel } from './i18n.js';
 import { h, api, toast, formatBytes, colorOfKind, pathOf, SCRIPT_KINDS } from './util.js';
+import { icon } from './icons.js';
 
-export function createInspector({ state, select, setFocus }) {
+export function createInspector({ state, select, setFocus, regroup }) {
   const panel = document.getElementById('inspector');
   const $ = (id) => document.getElementById(id);
   const editTarget = (node) => (node.kind === 'function' ? state.nodes.get(node.parent) || node : node);
@@ -74,7 +75,11 @@ export function createInspector({ state, select, setFocus }) {
         // Abre el script en la línea donde tienes el cursor / Opens the script at your cursor's line
         onclick: () => studioCommand({ type: 'open', id: node.id, line: state.editor ? state.editor.cm.currentLine() : undefined }),
       }));
-    } else if (node.source === 'disk') {
+    }
+    if (state.expanded.has(node.id)) {
+      actions.push(h('button', { class: 'btn', type: 'button', text: t('regroup'), onclick: () => { regroup(node.id); renderMeta(); } }));
+    }
+    if (node.source === 'disk') {
       actions.push(h('button', {
         class: 'btn',
         type: 'button',
@@ -85,10 +90,10 @@ export function createInspector({ state, select, setFocus }) {
 
     $('insp-head').replaceChildren(
       h('div', { class: 'insp-title' },
-        h('span', { class: 'dot', style: `color:${colorOfKind(node.kind)}` }),
+        h('span', { class: 'kind-badge', style: `color:${colorOfKind(node.kind)}` }, icon(node.kind)),
         h('h1', { text: node.name }),
         h('button', { class: 'icon-btn', type: 'button', title: t('close'), 'aria-label': t('close'), onclick: () => close(), text: '✕' })),
-      h('p', { class: 'insp-path', text: pathOf(node, state.nodes) }),
+      breadcrumb(node),
       h('div', { class: 'chips' },
         chips.map((c) => h('span', { class: 'chip', text: c })),
         issues.map((i) => h('span', { class: 'chip bad', text: `⚠ ${issueLabel(i.type)}${i.detail ? `: ${i.detail}` : ''}` }))),
@@ -96,6 +101,16 @@ export function createInspector({ state, select, setFocus }) {
     );
 
     $('insp-meta').replaceChildren(...metaSections(node));
+  }
+
+  // Ruta con cada tramo pulsable para subir de nivel / Path where each step is clickable to go up
+  function breadcrumb(node) {
+    const chain = [];
+    for (let n = state.nodes.get(node.parent); n; n = state.nodes.get(n.parent)) chain.unshift(n);
+    if (!chain.length) return h('p', { class: 'insp-path', text: pathOf(node, state.nodes) });
+    return h('nav', { class: 'insp-path', 'aria-label': 'Path' },
+      chain.map((n) => [h('button', { type: 'button', text: n.name, onclick: () => select(n.id) }), h('span', { class: 'sep', text: '/' })]),
+      h('span', { class: 'here', text: node.name }));
   }
 
   function metaSections(node) {
@@ -142,7 +157,7 @@ export function createInspector({ state, select, setFocus }) {
         h('h3', { text: `${title} (${nodes.length})` }),
         h('div', { class: 'links-list' },
           shown.map((n) => h('button', { class: 'link-item', type: 'button', onclick: () => select(n.id) },
-            h('span', { class: 'dot', style: `color:${colorOfKind(n.kind)}` }),
+            icon(n.kind, colorOfKind(n.kind)),
             h('span', { class: 'name', text: n.kind === 'function' ? `${state.nodes.get(n.parent)?.name || ''} · ${n.name}` : n.name }),
             h('span', { class: 'sub', text: kindLabel(n.kind) }))),
           nodes.length > shown.length ? h('span', { class: 'sub', text: `+${nodes.length - shown.length}` }) : null)));

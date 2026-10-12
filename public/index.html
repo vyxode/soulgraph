@@ -8,10 +8,21 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
+  <!-- Pantalla de carga: la estrella se dibuja, se enciende y aparece el nombre con un glitch.
+       Loading screen: the star draws itself, ignites and the name appears with a glitch. -->
+  <div class="loader" id="loader" role="status" aria-live="polite">
+    <svg class="loader-star" viewBox="0 0 32 32" aria-hidden="true"><path pathLength="1" d="M16 1 C17 12 20 15 31 16 C20 17 17 20 16 31 C15 20 12 17 1 16 C12 15 15 12 16 1Z"/></svg>
+    <svg class="loader-wordmark" viewBox="0 180 3839 740" aria-label="SoulGraph"><path d="M22 734V694H126V742Q126 810 183 810Q211 810 225.5 793.5Q240 777 240 740Q240 696 220.0 662.5Q200 629 146 582Q78 522 51.0 473.5Q24 425 24 364Q24 281 66.0 235.5Q108 190 188 190Q267 190 307.5 235.5Q348 281 348 366V395H244V359Q244 323 230.0 306.5Q216 290 189 290Q134 290 134 357Q134 395 154.5 428.0Q175 461 229 508Q298 568 324.0 617.0Q350 666 350 732Q350 818 307.5 864.0Q265 910 184 910Q104 910 63.0 864.5Q22 819 22 734Z M445 734V366Q445 282 488.0 236.0Q531 190 612 190Q693 190 736.0 236.0Q779 282 779 366V734Q779 818 736.0 864.0Q693 910 612 910Q531 910 488.0 864.0Q445 818 445 734ZM669 741V359Q669 290 612 290Q555 290 555 359V741Q555 810 612 810Q669 810 669 741Z M889 734V200H999V742Q999 778 1013.5 794.0Q1028 810 1055 810Q1082 810 1096.5 794.0Q1111 778 1111 742V200H1217V734Q1217 819 1175.0 864.5Q1133 910 1053 910Q973 910 931.0 864.5Q889 819 889 734Z M1335 200H1445V800H1626V900H1335Z M1711 734V366Q1711 281 1753.0 235.5Q1795 190 1875 190Q1955 190 1997.0 235.5Q2039 281 2039 366V426H1935V359Q1935 290 1878 290Q1821 290 1821 359V742Q1821 810 1878 810Q1935 810 1935 742V605H1880V505H2039V734Q2039 819 1997.0 864.5Q1955 910 1875 910Q1795 910 1753.0 864.5Q1711 819 1711 734Z M2150 200H2313Q2398 200 2437.0 239.5Q2476 279 2476 361V404Q2476 513 2404 542V544Q2444 556 2460.5 593.0Q2477 630 2477 692V815Q2477 845 2479.0 863.5Q2481 882 2489 900H2377Q2371 883 2369.0 868.0Q2367 853 2367 814V686Q2367 638 2351.5 619.0Q2336 600 2298 600H2260V900H2150ZM2300 500Q2333 500 2349.5 483.0Q2366 466 2366 426V372Q2366 334 2352.5 317.0Q2339 300 2310 300H2260V500Z M2678 200H2827L2941 900H2831L2811 761V763H2686L2666 900H2564ZM2798 668 2749 322H2747L2699 668Z M3034 200H3196Q3278 200 3319.0 244.0Q3360 288 3360 373V442Q3360 527 3319.0 571.0Q3278 615 3196 615H3144V900H3034ZM3196 515Q3223 515 3236.5 500.0Q3250 485 3250 449V366Q3250 330 3236.5 315.0Q3223 300 3196 300H3144V515Z M3460 200H3570V485H3688V200H3798V900H3688V585H3570V900H3460Z"/></svg>
+    <p class="loader-status" id="loader-status"></p>
+  </div>
+
   <header class="topbar">
     <div class="brand">
-      <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M16 1 C17 12 20 15 31 16 C20 17 17 20 16 31 C15 20 12 17 1 16 C12 15 15 12 16 1Z"/></svg>
-      <span class="brand-name glitch" data-text="SOULGRAPH">SOULGRAPH</span>
+      <button class="icon-btn" id="sidebar-toggle" type="button" aria-expanded="true" aria-controls="sidebar" data-i18n-title="toggleSidebar">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h10M4 18h16"/></svg>
+      </button>
+      <svg class="brand-star" viewBox="0 0 32 32" aria-hidden="true"><path d="M16 1 C17 12 20 15 31 16 C20 17 17 20 16 31 C15 20 12 17 1 16 C12 15 15 12 16 1Z"/></svg>
+      <svg class="brand-wordmark glitch-svg" viewBox="0 180 3839 740" aria-label="SoulGraph"><path d="M22 734V694H126V742Q126 810 183 810Q211 810 225.5 793.5Q240 777 240 740Q240 696 220.0 662.5Q200 629 146 582Q78 522 51.0 473.5Q24 425 24 364Q24 281 66.0 235.5Q108 190 188 190Q267 190 307.5 235.5Q348 281 348 366V395H244V359Q244 323 230.0 306.5Q216 290 189 290Q134 290 134 357Q134 395 154.5 428.0Q175 461 229 508Q298 568 324.0 617.0Q350 666 350 732Q350 818 307.5 864.0Q265 910 184 910Q104 910 63.0 864.5Q22 819 22 734Z M445 734V366Q445 282 488.0 236.0Q531 190 612 190Q693 190 736.0 236.0Q779 282 779 366V734Q779 818 736.0 864.0Q693 910 612 910Q531 910 488.0 864.0Q445 818 445 734ZM669 741V359Q669 290 612 290Q555 290 555 359V741Q555 810 612 810Q669 810 669 741Z M889 734V200H999V742Q999 778 1013.5 794.0Q1028 810 1055 810Q1082 810 1096.5 794.0Q1111 778 1111 742V200H1217V734Q1217 819 1175.0 864.5Q1133 910 1053 910Q973 910 931.0 864.5Q889 819 889 734Z M1335 200H1445V800H1626V900H1335Z M1711 734V366Q1711 281 1753.0 235.5Q1795 190 1875 190Q1955 190 1997.0 235.5Q2039 281 2039 366V426H1935V359Q1935 290 1878 290Q1821 290 1821 359V742Q1821 810 1878 810Q1935 810 1935 742V605H1880V505H2039V734Q2039 819 1997.0 864.5Q1955 910 1875 910Q1795 910 1753.0 864.5Q1711 819 1711 734Z M2150 200H2313Q2398 200 2437.0 239.5Q2476 279 2476 361V404Q2476 513 2404 542V544Q2444 556 2460.5 593.0Q2477 630 2477 692V815Q2477 845 2479.0 863.5Q2481 882 2489 900H2377Q2371 883 2369.0 868.0Q2367 853 2367 814V686Q2367 638 2351.5 619.0Q2336 600 2298 600H2260V900H2150ZM2300 500Q2333 500 2349.5 483.0Q2366 466 2366 426V372Q2366 334 2352.5 317.0Q2339 300 2310 300H2260V500Z M2678 200H2827L2941 900H2831L2811 761V763H2686L2666 900H2564ZM2798 668 2749 322H2747L2699 668Z M3034 200H3196Q3278 200 3319.0 244.0Q3360 288 3360 373V442Q3360 527 3319.0 571.0Q3278 615 3196 615H3144V900H3034ZM3196 515Q3223 515 3236.5 500.0Q3250 485 3250 449V366Q3250 330 3236.5 315.0Q3223 300 3196 300H3144V515Z M3460 200H3570V485H3688V200H3798V900H3688V585H3570V900H3460Z"/></svg>
       <a class="by" href="https://github.com/vyxode/soulgraph" target="_blank" rel="noopener">by <span class="glitch" data-text="VYXODE">VYXODE</span></a>
       <span class="project" id="project-name"></span>
     </div>
@@ -22,7 +33,7 @@
     </div>
   </header>
 
-  <aside class="sidebar" aria-label="Filters">
+  <aside class="sidebar" id="sidebar" aria-label="Filters">
     <div class="segmented" id="search-mode" role="group">
       <button type="button" data-mode="names" aria-pressed="true" data-i18n="modeNames"></button>
       <button type="button" data-mode="code" aria-pressed="false" data-i18n="modeCode"></button>
@@ -30,6 +41,7 @@
     <label class="search">
       <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
       <input id="search" type="search" autocomplete="off" spellcheck="false">
+      <kbd>/</kbd>
     </label>
     <p class="hint" id="search-hint"></p>
     <div class="code-results" id="code-results"></div>
@@ -59,22 +71,33 @@
       <h2 data-i18n="links"></h2>
       <div id="link-filters"></div>
     </section>
-    <section>
-      <h2 data-i18n="labels"></h2>
+
+    <footer><span id="stats"></span></footer>
+  </aside>
+
+  <main id="graph" aria-label="Graph"></main>
+
+  <!-- Controles de la vista / View controls -->
+  <div class="toolbar" role="toolbar">
+    <button class="tool" id="reset-btn" type="button" data-i18n-title="resetView">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
+    </button>
+    <div class="tool-group">
+      <span data-i18n="labels"></span>
       <div class="segmented" id="label-mode" role="group">
         <button type="button" data-mode="off" data-i18n="labelsOff"></button>
         <button type="button" data-mode="main" data-i18n="labelsMain"></button>
         <button type="button" data-mode="all" data-i18n="labelsAll"></button>
       </div>
-    </section>
-
-    <footer>
-      <span id="stats"></span>
-      <button class="ghost" id="reset-btn" type="button" data-i18n="resetView"></button>
-    </footer>
-  </aside>
-
-  <main id="graph" aria-label="Graph"></main>
+    </div>
+    <div class="tool-group">
+      <span data-i18n="quality"></span>
+      <div class="segmented" id="quality-mode" role="group">
+        <button type="button" data-mode="high" data-i18n="qualityHigh"></button>
+        <button type="button" data-mode="low" data-i18n="qualityLow"></button>
+      </div>
+    </div>
+  </div>
 
   <aside class="inspector" id="inspector" hidden></aside>
 

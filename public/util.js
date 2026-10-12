@@ -10,6 +10,7 @@ export const KIND_COLORS = {
   service: '#c9d1ff',
   folder: '#5d6d94',
   model: '#9d7bff',
+  group: '#b9a6ff',
   instance: '#7f88a8',
   server: '#3ddc97',
   client: '#4cc9f0',
@@ -50,7 +51,7 @@ export function h(tag, props = {}, ...children) {
     else if (key in el) el[key] = value;
     else el.setAttribute(key, value);
   }
-  for (const child of children.flat()) {
+  for (const child of children.flat(Infinity)) {
     if (child === null || child === undefined || child === false) continue;
     el.append(child instanceof Node ? child : document.createTextNode(String(child)));
   }
