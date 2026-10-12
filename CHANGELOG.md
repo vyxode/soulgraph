@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.3.1 — performance
+
+- **About 6× fewer draw calls with full effects.** On a real 1,400-node project, draw calls per frame went from 2,827 to 462 and triangles from 424k to 107k.
+  - Halos are a single point cloud with a custom shader, instead of one sprite per node.
+  - All links are drawn as two line objects, with curves computed in JS, instead of one object per link.
+  - Spheres are opaque, so they're no longer sorted every frame.
+  - Impulses only run on the links of what you're looking at, plus about 60 in the background.
+  - Bloom is computed at half resolution.
+- **FPS governor:** in full mode it measures FPS every second. Under ~33 FPS it lowers the internal resolution step by step and finally turns off the bloom. With headroom it goes back up. Only if even that can't reach ~30 FPS does it switch to light mode and tell you.
+
 ## 0.3.0
 
 - **Loading screen:** the SoulGraph star draws itself, ignites and the name appears with a glitch while the graph is laid out.

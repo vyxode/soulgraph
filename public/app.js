@@ -81,6 +81,13 @@ const view = createView({
     state.hoverId = n ? n.id : null;
     setFocus(n ? n.id : state.selectedId);
   },
+  // Ni bajando la resolución llega a ~30 FPS: pasamos a efectos ligeros y te lo decimos.
+  // Even at lower resolution it can't reach ~30 FPS: switch to light effects and tell you.
+  onTooSlow: () => {
+    view.setQuality('low');
+    renderToolbar();
+    toast(t('autoLow'));
+  },
 });
 
 const inspector = createInspector({ state, select, setFocus, regroup });
@@ -639,17 +646,6 @@ async function finishLoading() {
   if (wait > 0) await new Promise((r) => setTimeout(r, wait));
   $('loader').classList.add('done');
   setTimeout(() => $('loader')?.remove(), 800);
-
-  // Si va a trompicones y no elegiste calidad, pasamos a efectos ligeros y te lo decimos.
-  // If it stutters and you didn't pick a quality, switch to light effects and tell you.
-  if (!userQuality && view.quality === 'high') {
-    const fps = await view.measureFps(3);
-    if (fps < 26) {
-      view.setQuality('low');
-      renderToolbar();
-      toast(t('autoLow'));
-    }
-  }
 }
 
 const nextFrame = () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));

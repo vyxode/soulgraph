@@ -12,8 +12,11 @@ const FLASH_MS = 1600; // lo que dura un destello / how long a flash lasts
 const LABEL_LAYOUT_MS = 200; // cada cuánto se recolocan los nombres / how often names are re-laid out
 const MAX_LABELS = { off: 0, main: 120, all: 600 };
 const BIG_KINDS = new Set(['root', 'game', 'service']);
+const AMBIENT_IMPULSES = 60; // impulsos "de fondo" cuando no miras nada / background impulses when nothing is focused
+const MIN_FPS = 33; // por debajo, se baja la resolución interna / below this, internal resolution drops
+const GOOD_FPS = 55; // por encima un buen rato, se vuelve a subir / above this for a while, it goes back up
 
-export function createView({ el, state, onNodeClick, onHover }) {
+export function createView({ el, state, onNodeClick, onHover, onTooSlow }) {
   const linkEnd = (end) => (typeof end === 'object' ? end.id : end);
   const isDimmed = (id) => (state.focus && !state.focus.has(id)) || (state.matches && !state.matches.has(id));
   let quality = 'high';
@@ -71,6 +74,12 @@ export function createView({ el, state, onNodeClick, onHover }) {
     .nodeThreeObject(objectOf)
     .linkColor(linkColor)
     .linkWidth((l) => (l.type === 'contains' ? 0 : 0.6))
+    // Las líneas las dibujamos nosotros de una vez (ver createLinkLines); la librería solo pinta
+    // las conexiones que llevan impulsos en ese momento.
+    // We draw the lines ourselves in one go (see createLinkLines); the library only draws the
+    // links carrying impulses right now.
+    .linkVisibility((l) => impulsesOf(l) > 0)
+    .nodeOpacity(1) // opacas: se dibujan sin ordenar, mucho más rápido / opaque: drawn without sorting, much faster
     .linkDirectionalParticleSpeed(0.004)
     .linkDirectionalParticleWidth(1.3)
     .linkDirectionalParticleColor(linkColor)
@@ -101,8 +110,13 @@ export function createView({ el, state, onNodeClick, onHover }) {
 
   const scene = Graph.scene();
   const renderer = Graph.renderer();
+  const composer = Graph.postProcessingComposer();
   const bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.85, 0.5, 0.14);
-  Graph.postProcessingComposer().addPass(bloom);
+  // El brillo se calcula a mitad de resolución: se ve casi igual y cuesta la cuarta parte.
+  // Bloom is computed at half resolution: it looks almost the same and costs a quarter.
+  const fullSetSize = bloom.setSize.bind(bloom);
+  bloom.setSize = (width, height) => fullSetSize(Math.max(1, Math.round(width / 2)), Math.max(1, Math.round(height / 2)));
+  composer.addPass(bloom);
 
   // Fondo con profundidad: polvo de estrellas lejano + niebla que apaga lo que está lejos.
   // Background with depth: distant star dust + fog that dims what's far away.
@@ -112,7 +126,7 @@ export function createView({ el, state, onNodeClick, onHover }) {
 
   addEventListener('resize', () => {
     Graph.width(innerWidth).height(innerHeight);
-    bloom.setSize(innerWidth, innerHeight);
+    halos.resize();
   });
 
   // No gastar batería con la pestaña oculta / Don't burn battery with the tab hidden
@@ -146,29 +160,56 @@ export function createView({ el, state, onNodeClick, onHover }) {
     return force;
   }
 
-  // ---------- Objetos de cada nodo: halo + nombre / Per-node objects: halo + name ----------
+  // ---------- Halos: una sola nube de puntos para todos los nodos ----------
+  // ---------- Halos: a single point cloud for every node ----------
+  // Un sprite por nodo eran cientos de llamadas de dibujo; así es una sola.
+  // One sprite per node meant hundreds of draw calls; this way it's just one.
 
-  const objects = new Map(); // id → { group, halo, label, text }
-  const glowTexture = makeGlowTexture();
+  const halos = createHalos(renderer, Graph.camera());
+  scene.add(halos.points);
+
+  function haloTint(node) {
+    if (quality !== 'high') return 0;
+    const base = BIG_KINDS.has(node.kind) ? 0.16 : 0.3;
+    return isDimmed(node.id) ? 0.05 : base + flashAmount(node.id) * 0.6;
+  }
+
+  function refreshHalos() {
+    halos.paint((node) => nodeColor(node), haloTint);
+  }
+
+  // ---------- Líneas: dos objetos para todas las conexiones / Lines: two objects for every link ----------
+  // Antes era un objeto (y una llamada de dibujo) por conexión; con miles de conexiones eso hundía los FPS.
+  // It used to be one object (and one draw call) per link; with thousands of links that sank the FPS.
+
+  const CURVATURE = 0.18;
+  const structure = createLinkLines(1); // "contiene", rectas / "contains", straight
+  const synapses = createLinkLines(8); // el resto, curvas en calidad alta / the rest, curved in high quality
+  scene.add(structure.lines, synapses.lines);
+  let lastLinks = [];
+
+  function setLines(links) {
+    lastLinks = links;
+    structure.setLinks(links.filter((l) => l.type === 'contains'), 0);
+    synapses.setLinks(links.filter((l) => l.type !== 'contains'), quality === 'high' ? CURVATURE : 0);
+  }
+
+  function refreshStructure() {
+    structure.paint(linkColor);
+    synapses.paint(linkColor);
+  }
+
+  // ---------- Objetos de cada nodo (solo para el nombre) / Per-node objects (names only) ----------
+
+  const objects = new Map(); // id → { group, label, text }
 
   function objectOf(node) {
     let entry = objects.get(node.id);
     if (!entry) {
-      const group = new THREE.Group();
-      const halo = new THREE.Sprite(new THREE.SpriteMaterial({
-        map: glowTexture, color: colorOfKind(node.kind), transparent: true, opacity: 0.5,
-        blending: THREE.AdditiveBlending, depthWrite: false,
-      }));
-      group.add(halo);
-      entry = { group, halo, label: null, text: '' };
+      entry = { group: new THREE.Group(), label: null, text: '' };
       objects.set(node.id, entry);
       scheduleLabels();
     }
-    // Los nodos grandes llevan un halo más contenido para no deslumbrar / Big nodes get a tighter halo so they don't dazzle
-    const r = radiusOf(node);
-    const spread = BIG_KINDS.has(node.kind) ? 2.6 : 4.2;
-    entry.halo.scale.set(r * spread, r * spread, 1);
-    entry.halo.visible = quality === 'high';
     return entry.group;
   }
 
@@ -176,27 +217,33 @@ export function createView({ el, state, onNodeClick, onHover }) {
     for (const [id, entry] of objects) {
       if (ids.has(id)) continue;
       if (entry.label) disposeLabel(entry);
-      entry.halo.material.dispose();
       objects.delete(id);
     }
   }
 
-  // Colores de esferas, halos y enlaces / Colors of spheres, halos and links
-  function refresh() {
-    Graph.nodeColor(Graph.nodeColor()).linkColor(Graph.linkColor()).linkDirectionalParticleColor(Graph.linkDirectionalParticleColor());
-    refreshHalos();
-    scheduleLabels();
-  }
+  // ---------- Impulsos / Impulses ----------
+  // Solo en las conexiones de lo que miras, más unas pocas de fondo: cada impulso es un objeto más que dibujar.
+  // Only on the links of what you're looking at, plus a few in the background: each impulse is one more object to draw.
 
-  function refreshHalos() {
-    if (quality !== 'high') return;
-    for (const [id, entry] of objects) {
-      const node = state.nodes.get(id);
-      if (!node) continue;
-      entry.halo.material.color.set(nodeColor(node));
-      const base = BIG_KINDS.has(node.kind) ? 0.18 : 0.32;
-      entry.halo.material.opacity = isDimmed(id) ? 0.06 : base + flashAmount(id) * 0.6;
-    }
+  let ambient = new Set();
+  function impulsesOf(l) {
+    if (quality !== 'high' || (l.type !== 'requires' && l.type !== 'signal')) return 0;
+    const center = state.hoverId || state.selectedId;
+    if (center && (linkEnd(l.source) === center || linkEnd(l.target) === center)) return 3;
+    return ambient.has(l) ? 1 : 0;
+  }
+  Graph.linkDirectionalParticles(impulsesOf);
+
+  // Colores de esferas, halos, enlaces e impulsos / Colors of spheres, halos, links and impulses
+  function refresh() {
+    Graph.nodeColor(Graph.nodeColor())
+      .linkColor(Graph.linkColor())
+      .linkDirectionalParticles(Graph.linkDirectionalParticles())
+      .linkVisibility(Graph.linkVisibility())
+      .linkDirectionalParticleColor(Graph.linkDirectionalParticleColor());
+    refreshHalos();
+    refreshStructure();
+    scheduleLabels();
   }
 
   // ---------- Nombres sin solaparse / Names that don't overlap ----------
@@ -313,7 +360,8 @@ export function createView({ el, state, onNodeClick, onHover }) {
   ring.visible = false;
   scene.add(ring);
 
-  (function animate(time) {
+  // Arranca en el siguiente fotograma, cuando ya existe todo lo de abajo / Starts next frame, once everything below exists
+  requestAnimationFrame(function animate(time) {
     const node = state.selectedId && state.nodes.get(state.selectedId);
     ring.visible = Boolean(node && node.x !== undefined);
     if (ring.visible) {
@@ -324,8 +372,12 @@ export function createView({ el, state, onNodeClick, onHover }) {
       ring.quaternion.copy(Graph.camera().quaternion); // siempre de cara / always facing you
     }
     stars.rotation.y = time * 0.000006;
+    if (quality === 'high') halos.move();
+    structure.move();
+    synapses.move();
+    governor.frame(time);
     requestAnimationFrame(animate);
-  })(0);
+  });
 
   // ---------- Destellos / Flashes ----------
 
@@ -365,34 +417,103 @@ export function createView({ el, state, onNodeClick, onHover }) {
   function setQuality(next) {
     quality = next;
     const high = quality === 'high';
-    bloom.enabled = high;
     stars.visible = high;
+    halos.points.visible = high;
+    structure.lines.material.opacity = high ? 0.4 : 0.3;
+    synapses.lines.material.opacity = high ? 0.6 : 0.45;
+    setLines(lastLinks);
     scene.fog = high ? fog : null;
-    renderer.setPixelRatio(high ? Math.min(devicePixelRatio, 1.5) : 1);
+    governor.reset();
     Graph
-      .nodeResolution(high ? 14 : 8)
-      .nodeOpacity(high ? 0.92 : 1)
+      .nodeResolution(high ? 12 : 8)
       .linkOpacity(high ? 0.5 : 0.35)
-      .linkCurvature((l) => (high && l.type !== 'contains' ? 0.18 : 0))
-      .linkDirectionalParticles((l) => (high && (l.type === 'requires' || l.type === 'signal') ? 2 : 0));
-    for (const entry of objects.values()) entry.halo.visible = high;
+      .linkCurvature((l) => (high && l.type !== 'contains' ? 0.18 : 0));
     refresh();
   }
 
-  // Mide los FPS unos segundos; si va a trompicones, avisa para pasar a modo ligero.
-  // Measures FPS for a few seconds; if it stutters, reports it so we can switch to light mode.
-  function measureFps(seconds = 4) {
-    return new Promise((resolve) => {
-      let frames = 0;
-      const start = performance.now();
-      const tick = (now) => {
+  // ---------- Regulador: calidad alta sin bajar de ~30 FPS ----------
+  // ---------- Governor: high quality without dropping below ~30 FPS ----------
+  // Mide los FPS cada segundo. Si van justos, baja la resolución interna (y al final el brillo);
+  // si sobran durante un rato, la vuelve a subir. Si ni así llega, avisa para pasar a "Ligeros".
+  // Measures FPS every second. If they're tight it lowers the internal resolution (and finally
+  // the bloom); if there's headroom for a while it raises it back. If even that isn't enough,
+  // it reports it so the panel can switch to "Light".
+
+  const governor = (() => {
+    const maxRatio = Math.min(devicePixelRatio || 1, 1.5);
+    const steps = [
+      { ratio: maxRatio, bloom: true },
+      { ratio: Math.min(maxRatio, 1.25), bloom: true },
+      { ratio: 1, bloom: true },
+      { ratio: 0.85, bloom: true },
+      { ratio: 0.85, bloom: false },
+      { ratio: 0.7, bloom: false },
+    ].filter((step, i, all) => i === 0 || step.ratio < all[i - 1].ratio || step.bloom !== all[i - 1].bloom);
+
+    let step = 0;
+    let frames = 0;
+    let windowStart = 0;
+    let slow = 0;
+    let fast = 0;
+    let holdUntil = 0; // tras bajar, no subir enseguida / after stepping down, don't step up right away
+    let warned = false;
+
+    function apply() {
+      const { ratio, bloom: useBloom } = quality === 'high' ? steps[step] : { ratio: 1, bloom: false };
+      renderer.setPixelRatio(ratio);
+      composer.setPixelRatio(ratio);
+      composer.setSize(el.clientWidth, el.clientHeight);
+      bloom.enabled = useBloom;
+      halos.resize();
+    }
+
+    return {
+      reset() {
+        step = 0;
+        slow = fast = 0;
+        apply();
+      },
+      frame(time) {
+        if (document.hidden || quality !== 'high') {
+          windowStart = 0;
+          return;
+        }
+        if (!windowStart) {
+          windowStart = time;
+          frames = 0;
+          return;
+        }
         frames++;
-        if (now - start < seconds * 1000) requestAnimationFrame(tick);
-        else resolve((frames * 1000) / (now - start));
-      };
-      requestAnimationFrame(tick);
-    });
-  }
+        if (time - windowStart < 1000) return;
+        const fps = (frames * 1000) / (time - windowStart);
+        windowStart = time;
+        frames = 0;
+
+        if (fps < MIN_FPS) {
+          fast = 0;
+          if (++slow >= 2 && step < steps.length - 1) {
+            step++;
+            slow = 0;
+            holdUntil = time + 20000;
+            apply();
+          } else if (slow >= 3 && step === steps.length - 1 && !warned) {
+            warned = true;
+            onTooSlow();
+          }
+        } else if (fps > GOOD_FPS && step > 0) {
+          slow = 0;
+          if (++fast >= 6 && time > holdUntil) {
+            step--;
+            fast = 0;
+            apply();
+          }
+        } else {
+          slow = 0;
+          fast = 0;
+        }
+      },
+    };
+  })();
 
   // ---------- Datos y cámara / Data and camera ----------
 
@@ -400,10 +521,18 @@ export function createView({ el, state, onNodeClick, onHover }) {
   let fitted = false;
   function render(nodes, links) {
     forget(new Set(nodes.map((n) => n.id)));
+    halos.setNodes(nodes, (n) => radiusOf(n) * (BIG_KINDS.has(n.kind) ? 2.6 : 4.2));
+    // Unos pocos impulsos de fondo, repartidos por todo el grafo / A few background impulses spread across the graph
+    const candidates = links.filter((l) => l.type === 'requires' || l.type === 'signal');
+    const every = Math.max(1, Math.ceil(candidates.length / AMBIENT_IMPULSES));
+    ambient = new Set(candidates.filter((_, i) => i % every === 0));
     // La primera vez se calcula la forma antes de enseñarla (la pantalla de carga lo tapa).
     // The first time the layout is computed before showing it (the loading screen covers it).
     Graph.warmupTicks(first ? Math.min(120, 20 + Math.round(nodes.length / 15)) : 0);
     Graph.graphData({ nodes, links });
+    setLines(links);
+    refreshHalos();
+    refreshStructure();
     if (first) {
       Graph.zoomToFit(0, 80);
       // Y otra vez, suave, cuando la forma se asiente / And again, smoothly, once the layout settles
@@ -433,10 +562,165 @@ export function createView({ el, state, onNodeClick, onHover }) {
     fire,
     flyTo,
     setQuality,
-    measureFps,
     fit: () => Graph.zoomToFit(900, 80),
     visibleNodes: () => Graph.graphData().nodes,
     get quality() { return quality; },
+  };
+}
+
+// Muchas conexiones en un único THREE.LineSegments, con color por vértice y curva opcional.
+// La curva imita la de 3d-force-graph para que coincida con la de los impulsos.
+// Many links in a single THREE.LineSegments, with per-vertex color and an optional curve.
+// The curve mimics 3d-force-graph's so it matches the impulses' path.
+function createLinkLines(segments) {
+  const geometry = new THREE.BufferGeometry();
+  const material = new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.45, depthWrite: false });
+  const lines = new THREE.LineSegments(geometry, material);
+  lines.frustumCulled = false;
+  const perLink = segments * 6; // 2 vértices × 3 coordenadas por segmento / 2 vertices × 3 coords per segment
+  let links = [];
+  let curvature = 0;
+  let capacity = 0;
+  const color = new THREE.Color();
+  const end = (e) => (typeof e === 'object' ? e : null);
+
+  function ensure(count) {
+    if (count <= capacity) return;
+    capacity = Math.max(256, 2 ** Math.ceil(Math.log2(count)));
+    geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(capacity * perLink), 3));
+    geometry.setAttribute('color', new THREE.BufferAttribute(new Float32Array(capacity * perLink), 3));
+  }
+
+  return {
+    lines,
+    setLinks(list, curve) {
+      links = list;
+      curvature = curve;
+      ensure(list.length);
+      geometry.setDrawRange(0, list.length * segments * 2);
+    },
+    move() {
+      if (!capacity) return;
+      const pos = geometry.attributes.position.array;
+      for (let i = 0; i < links.length; i++) {
+        const a = end(links[i].source);
+        const b = end(links[i].target);
+        if (!a || !b) continue; // la librería aún no ha enlazado los nodos / the library hasn't linked the nodes yet
+        const ax = a.x || 0, ay = a.y || 0, az = a.z || 0;
+        const bx = b.x || 0, by = b.y || 0, bz = b.z || 0;
+        const dx = bx - ax, dy = by - ay, dz = bz - az;
+        // Punto de control: punto medio desplazado en perpendicular / Control point: midpoint pushed sideways
+        let cx = (ax + bx) / 2, cy = (ay + by) / 2, cz = (az + bz) / 2;
+        if (curvature) {
+          if (dx || dy) { cx += dy * curvature; cy -= dx * curvature; } else cx -= dz * curvature;
+        }
+        let px = ax, py = ay, pz = az;
+        let o = i * perLink;
+        for (let s = 1; s <= segments; s++) {
+          const t = s / segments, u = 1 - t;
+          const qx = u * u * ax + 2 * u * t * cx + t * t * bx;
+          const qy = u * u * ay + 2 * u * t * cy + t * t * by;
+          const qz = u * u * az + 2 * u * t * cz + t * t * bz;
+          pos[o++] = px; pos[o++] = py; pos[o++] = pz;
+          pos[o++] = qx; pos[o++] = qy; pos[o++] = qz;
+          px = qx; py = qy; pz = qz;
+        }
+      }
+      geometry.attributes.position.needsUpdate = true;
+    },
+    paint(colorOf) {
+      if (!capacity) return;
+      const colors = geometry.attributes.color.array;
+      for (let i = 0; i < links.length; i++) {
+        color.set(colorOf(links[i]));
+        for (let v = 0; v < segments * 2; v++) colors.set([color.r, color.g, color.b], i * perLink + v * 3);
+      }
+      geometry.attributes.color.needsUpdate = true;
+    },
+  };
+}
+
+// Nube de halos: un único THREE.Points con tamaño y color por punto (shader propio).
+// Halo cloud: a single THREE.Points with per-point size and color (custom shader).
+function createHalos(renderer, camera) {
+  const geometry = new THREE.BufferGeometry();
+  const material = new THREE.ShaderMaterial({
+    uniforms: { map: { value: makeGlowTexture() }, scale: { value: 1 } },
+    vertexShader: `
+      attribute float size;
+      attribute vec3 tint;
+      uniform float scale;
+      varying vec3 vTint;
+      void main() {
+        vTint = tint;
+        vec4 mv = modelViewMatrix * vec4(position, 1.0);
+        gl_PointSize = size * scale / -mv.z;
+        gl_Position = projectionMatrix * mv;
+      }`,
+    fragmentShader: `
+      uniform sampler2D map;
+      varying vec3 vTint;
+      void main() {
+        gl_FragColor = vec4(vTint * texture2D(map, gl_PointCoord).a, 1.0);
+      }`,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+    transparent: true,
+  });
+  const points = new THREE.Points(geometry, material);
+  points.frustumCulled = false;
+  points.renderOrder = 1;
+
+  let nodes = [];
+  let capacity = 0;
+  const color = new THREE.Color();
+
+  function ensure(count) {
+    if (count <= capacity) return;
+    capacity = Math.max(256, 2 ** Math.ceil(Math.log2(count)));
+    geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(capacity * 3), 3));
+    geometry.setAttribute('size', new THREE.BufferAttribute(new Float32Array(capacity), 1));
+    geometry.setAttribute('tint', new THREE.BufferAttribute(new Float32Array(capacity * 3), 3));
+  }
+
+  return {
+    points,
+    setNodes(list, sizeOf) {
+      nodes = list;
+      ensure(list.length);
+      const sizes = geometry.attributes.size.array;
+      list.forEach((n, i) => { sizes[i] = sizeOf(n); });
+      geometry.attributes.size.needsUpdate = true;
+      geometry.setDrawRange(0, list.length);
+    },
+    move() {
+      if (!capacity) return;
+      const pos = geometry.attributes.position.array;
+      for (let i = 0; i < nodes.length; i++) {
+        const n = nodes[i];
+        pos[i * 3] = n.x || 0;
+        pos[i * 3 + 1] = n.y || 0;
+        pos[i * 3 + 2] = n.z || 0;
+      }
+      geometry.attributes.position.needsUpdate = true;
+    },
+    paint(colorOf, strengthOf) {
+      if (!capacity) return;
+      const tint = geometry.attributes.tint.array;
+      for (let i = 0; i < nodes.length; i++) {
+        const k = strengthOf(nodes[i]);
+        color.set(colorOf(nodes[i]));
+        tint[i * 3] = color.r * k;
+        tint[i * 3 + 1] = color.g * k;
+        tint[i * 3 + 2] = color.b * k;
+      }
+      geometry.attributes.tint.needsUpdate = true;
+    },
+    // Píxeles por unidad a distancia 1, según la altura real del lienzo / Pixels per unit at distance 1, from the real canvas height
+    resize() {
+      const height = renderer.domElement.height;
+      material.uniforms.scale.value = height / (2 * Math.tan((camera.fov * Math.PI) / 360));
+    },
   };
 }
 
