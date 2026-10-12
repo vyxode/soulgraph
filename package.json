@@ -28,8 +28,7 @@
     "roblox",
     "skills",
     ".claude-plugin",
-    "CHANGELOG.md",
-    ".mcp.json"
+    "CHANGELOG.md"
   ],
   "engines": {
     "node": ">=20"

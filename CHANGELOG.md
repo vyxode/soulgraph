@@ -3,7 +3,7 @@
 ## 0.2.0
 
 - **Claude tools (MCP):** `soulgraph mcp` with overview, find, code search, node, health, edit and open-in-Studio.
-  It starts the panel by itself when needed. The plugin ships it in `.mcp.json`.
+  It starts the panel by itself when needed. The plugin declares it in `plugin.json`.
 - **Function graph:** public module functions are nodes, with `calls` links from the scripts that use them.
 - **RemoteEvents / BindableEvents:** `signal` links from the script that fires to the event to the script that listens.
 - **Health:** broken requires, circular requires, duplicate module names, possibly unused modules, events with no sender or listener.

@@ -1,8 +1,0 @@
-{
-  "mcpServers": {
-    "soulgraph": {
-      "command": "node",
-      "args": ["${CLAUDE_PLUGIN_ROOT}/cli/soulgraph.js", "mcp", "${CLAUDE_PROJECT_DIR}"]
-    }
-  }
-}
