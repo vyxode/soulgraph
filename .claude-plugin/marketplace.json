@@ -1,0 +1,15 @@
+{
+  "name": "vyxode",
+  "description": "Vyxode's Claude Code plugins.",
+  "owner": {
+    "name": "Vyxode",
+    "url": "https://github.com/Vyxode"
+  },
+  "plugins": [
+    {
+      "name": "soulgraph",
+      "source": "./",
+      "description": "Live map of your project (files + Roblox Studio) for Claude, with a 3D neural-network panel on localhost."
+    }
+  ]
+}

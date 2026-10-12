@@ -1,0 +1,13 @@
+{
+  "name": "soulgraph",
+  "version": "0.1.0",
+  "description": "Gives Claude a live map of your project (files + Roblox Studio) so it finds things without opening files one by one. Includes a 3D neural-network panel on localhost.",
+  "author": {
+    "name": "Vyxode",
+    "url": "https://github.com/Vyxode"
+  },
+  "homepage": "https://github.com/Vyxode/soulgraph",
+  "repository": "https://github.com/Vyxode/soulgraph",
+  "license": "MIT",
+  "keywords": ["roblox", "roblox-studio", "knowledge-graph", "code-map", "luau"]
+}

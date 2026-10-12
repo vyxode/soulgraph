@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SoulGraph</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M16 1 C17 12 20 15 31 16 C20 17 17 20 16 31 C15 20 12 17 1 16 C12 15 15 12 16 1Z' fill='white'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M16 1 C17 12 20 15 31 16 C20 17 17 20 16 31 C15 20 12 17 1 16 C12 15 15 12 16 1Z"/></svg>
+      <span class="brand-name">SoulGraph</span>
+      <span class="project" id="project-name"></span>
+    </div>
+    <div class="status">
+      <span class="pill" id="live-pill"><i></i><span></span></span>
+      <span class="pill" id="studio-pill"><i></i><span></span></span>
+      <button class="ghost" id="lang-btn" type="button"></button>
+    </div>
+  </header>
+
+  <aside class="sidebar" aria-label="Filters">
+    <label class="search">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
+      <input id="search" type="search" autocomplete="off" spellcheck="false">
+    </label>
+    <p class="hint" id="search-hint"></p>
+
+    <section>
+      <h2 data-i18n="sources"></h2>
+      <div id="source-filters"></div>
+    </section>
+    <section>
+      <h2 data-i18n="kinds"></h2>
+      <div id="kind-filters"></div>
+    </section>
+    <section>
+      <h2 data-i18n="links"></h2>
+      <div id="link-filters"></div>
+    </section>
+
+    <footer>
+      <span id="stats"></span>
+      <button class="ghost" id="reset-btn" type="button" data-i18n="resetView"></button>
+    </footer>
+  </aside>
+
+  <main id="graph" aria-label="Graph"></main>
+
+  <aside class="inspector" id="inspector" hidden></aside>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script src="vendor/graph-bundle.js"></script>
+  <script type="module" src="app.js"></script>
+</body>
+</html>
