@@ -628,6 +628,18 @@ addEventListener('keydown', (e) => {
   }
 });
 
+// Sin menú del botón derecho ni arrastres del navegador, salvo donde se escribe (editor y campos).
+// El botón derecho sigue sirviendo para mover la vista del grafo.
+// No browser right-click menu or drag-and-drop, except where you type (editor and fields).
+// Right-click still pans the graph view.
+const editable = (target) => target instanceof Element && target.closest('input, textarea, .cm-editor');
+addEventListener('contextmenu', (e) => {
+  if (!editable(e.target)) e.preventDefault();
+});
+addEventListener('dragstart', (e) => {
+  if (!editable(e.target)) e.preventDefault();
+});
+
 addEventListener('beforeunload', (e) => {
   if ((state.editor && state.editor.dirty) || (state.props && state.props.dirty)) e.preventDefault();
 });

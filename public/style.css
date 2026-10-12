@@ -39,6 +39,14 @@ html, body {
 }
 
 button, input, textarea { font: inherit; color: inherit; }
+
+/* El panel es una aplicación, no un documento: no se selecciona texto al arrastrar.
+   Solo se puede seleccionar en el editor y en los campos de texto.
+   The panel is an app, not a document: dragging doesn't select text.
+   Selecting only works in the editor and text fields. */
+body { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+input, textarea, .cm-editor { -webkit-user-select: text; user-select: text; }
+img, svg, a { -webkit-user-drag: none; }
 button { cursor: pointer; }
 :focus-visible { outline: 1px solid var(--ink); outline-offset: 2px; }
 
